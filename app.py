@@ -555,7 +555,6 @@ async def loadtest(
 
 @bot.tree.command(name='status', description='Check bot configuration')
 async def status(interaction: discord.Interaction):
-    '''Show bot status'''
     embed = Embed(title='🛡️ Bot Status', color=discord.Color.blue())
     
     embed.add_field(
