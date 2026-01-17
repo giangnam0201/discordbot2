@@ -422,7 +422,6 @@ async def loadtest(
     delay: app_commands.Range[float, MIN_DELAY, 10.0] = 0.1,
     mode: str = 'standard'
 ):
-    '''Start a load test'''
     
     # Check if verification is needed
     parsed = urlparse(url if '://' in url else f'https://{url}')
