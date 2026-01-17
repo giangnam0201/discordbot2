@@ -23,7 +23,7 @@ for key, value in st.secrets.items():
 
 # --- 3. YOUR CODE ---
 # Use triple double quotes to avoid single quote conflicts
-RAW_CODE = '''
+RAW_CODE = """
 # Discord Load Testing Bot - FIXED VERSION
 # FOR LEGITIMATE INFRASTRUCTURE TESTING ONLY
 
@@ -297,7 +297,6 @@ bot = LoadTestBot()
 # ==================== VERIFICATION HELPERS ====================
 
 def is_ip_address(target: str) -> bool:
-    """Check if target is an IP address"""
     try:
         ipaddress.ip_address(target)
         return True
@@ -305,7 +304,6 @@ def is_ip_address(target: str) -> bool:
         return False
 
 def is_private_network(target: str) -> bool:
-    """Check if IP is private/localhost"""
     try:
         ip = ipaddress.ip_address(target)
         return ip.is_private or ip.is_loopback
@@ -313,7 +311,6 @@ def is_private_network(target: str) -> bool:
         return False
 
 def needs_verification(url: str) -> bool:
-    """Determine if URL needs domain verification"""
     if DEV_MODE:
         return False
     
@@ -342,7 +339,6 @@ def needs_verification(url: str) -> bool:
 @bot.tree.command(name='verify', description='Verify domain ownership (not needed for localhost/IPs)')
 @app_commands.describe(domain='Domain or IP to verify')
 async def verify_domain(interaction: discord.Interaction, domain: str):
-    """Verify you own a domain"""
     await interaction.response.defer(ephemeral=True)
     
     # Check if it's an IP
@@ -588,7 +584,7 @@ if __name__ == '__main__':
     print('='*50)
     
     bot.run(BOT_TOKEN)
-'''
+"""
 
 # --- 4. STARTUP ENGINE ---
 def run_bot():
