@@ -17,25 +17,26 @@ st.set_page_config(page_title="Bot Server", page_icon="🚀")
 st.title("Service Status: Online ✅")
 st.write("The bot is running in the background.")
 
-# BRIDGE: Injects Streamlit Secrets into the environment
+# Injects Streamlit Secrets into environment
 for key, value in st.secrets.items():
     os.environ[key] = str(value)
 
 # --- 3. YOUR CODE ---
-# Use triple single quotes to avoid conflicts
+# Use triple single quotes - ALL parameters must have type annotations for discord.py
 RAW_CODE = '''
-# Discord Load Testing Bot - FIXED FOR STREAMLIT
+# Discord Load Testing Bot - FIXED FOR STREAMLIT & DISCORD.PY
 import os
 import asyncio
 import random
 import time
 import json
 from datetime import datetime
+from typing import List, Dict, Optional, Tuple
 from urllib.parse import urlparse
 import ipaddress
 
 import discord
-from discord import app_commands, ui, Embed, File
+from discord import app_commands, ui, Embed, File, Interaction
 from discord.ext import commands
 import aiohttp
 from aiohttp import ClientSession, ClientTimeout, ClientError
@@ -214,7 +215,7 @@ class TestView(ui.View):
         self.tester = tester
     
     @ui.button(label="Stop Test", style=discord.ButtonStyle.danger)
-    async def stop_test(self, interaction, button):
+    async def stop_test(self, interaction: Interaction, button: ui.Button):
         if self.tester.is_running:
             self.tester.is_running = False
             await interaction.response.send_message("Stopping test...", ephemeral=True)
@@ -312,12 +313,17 @@ def needs_verification(url):
 # ==================== COMMANDS ====================
 
 @bot.tree.command(name="verify", description="Verify domain ownership")
-async def verify_domain(interaction, domain):
+@app_commands.describe(domain="Domain or IP to verify")
+async def verify_domain(interaction: Interaction, domain: str):
+    """Verify you own a domain"""
     await interaction.response.defer(ephemeral=True)
     
     if is_ip_address(domain):
         if is_private_network(domain):
-            await interaction.followup.send("Private IP - no verification needed", ephemeral=True)
+            await interaction.followup.send(
+                "Private IP - no verification needed", 
+                ephemeral=True
+            )
             return
         else:
             VERIFIED_DOMAINS.add(domain)
@@ -355,13 +361,15 @@ async def verify_domain(interaction, domain):
     mode="Testing mode"
 )
 async def loadtest(
-    interaction,
-    url,
-    requests,
-    threads=DEFAULT_THREADS,
-    delay=0.1,
-    mode="standard"
+    interaction: Interaction,
+    url: str,
+    requests: app_commands.Range[int, 1, MAX_REQUESTS_PER_TEST],
+    threads: app_commands.Range[int, 1, MAX_THREADS] = DEFAULT_THREADS,
+    delay: app_commands.Range[float, MIN_DELAY, 10.0] = 0.1,
+    mode: str = "standard"
 ):
+    """Start a load test"""
+    
     hostname = urlparse(url if "://" in url else f"https://{url}").netloc or urlparse(url).path
     hostname = hostname.split(":")[0]
     
@@ -412,7 +420,8 @@ async def loadtest(
         asyncio.create_task(run_test())
 
 @bot.tree.command(name="status", description="Check bot status")
-async def status(interaction):
+async def status(interaction: Interaction):
+    """Show bot status"""
     embed = Embed(title="Bot Status", color=discord.Color.blue())
     embed.add_field(name="Active Tests", value=len(bot.testing_in_progress))
     embed.add_field(name="Dev Mode", value="ON" if DEV_MODE else "OFF")
