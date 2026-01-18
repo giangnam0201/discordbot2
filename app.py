@@ -248,7 +248,7 @@ class LoadTestBot(commands.Bot):
         
         embed = Embed(
             title='🚀 Load Test in Progress',
-            description=f'**URL:** {url}\n**Test ID:** {tester.test_id}',
+            description=f"**URL:** {url}\n**Test ID:** {tester.test_id}",
             color=discord.Color.yellow(),
             timestamp=datetime.now()
         )
