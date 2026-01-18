@@ -22,18 +22,15 @@ for key, value in st.secrets.items():
     os.environ[key] = str(value)
 
 # --- 3. YOUR CODE ---
-# Use triple double quotes to avoid single quote conflicts
-RAW_CODE = """
-# Discord Load Testing Bot - FIXED VERSION
-# FOR LEGITIMATE INFRASTRUCTURE TESTING ONLY
-
+# Use triple single quotes to avoid conflicts
+RAW_CODE = '''
+# Discord Load Testing Bot - FIXED FOR STREAMLIT
 import os
 import asyncio
 import random
 import time
 import json
 from datetime import datetime
-from typing import List, Dict, Optional, Tuple
 from urllib.parse import urlparse
 import ipaddress
 
@@ -48,14 +45,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# SAFETY LIMITS - DO NOT MODIFY
-MAX_REQUESTS_PER_TEST = 10_000
+# SAFETY LIMITS
+MAX_REQUESTS_PER_TEST = 10000
 MAX_REQUESTS_PER_SECOND = 100
 DEFAULT_THREADS = 10
 MAX_THREADS = 50
 MIN_DELAY = 0.01
 
-# Development mode: Allow localhost and IPs without verification
+# Development mode
 DEV_MODE = os.getenv("DEV_MODE", "false").lower() == "true"
 
 # Domain verification storage
@@ -63,15 +60,15 @@ VERIFIED_DOMAINS = set()
 
 # User-Agent pool
 USER_AGENTS = [
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15',
-    'PostmanRuntime/7.36.0',
-    'curl/8.4.0'
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15",
+    "PostmanRuntime/7.36.0",
+    "curl/8.4.0"
 ]
 
-BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 if not BOT_TOKEN:
-    print('❌ Error: DISCORD_BOT_TOKEN not found in .env file')
+    print("Error: DISCORD_BOT_TOKEN not found")
     exit(1)
 
 # ==================== LOAD TESTER ENGINE ====================
@@ -83,34 +80,33 @@ class LoadTestMetrics:
         self.total_requests = 0
         self.successful_requests = 0
         self.failed_requests = 0
-        self.status_codes: Dict[int, int] = {}
-        self.response_times: List[float] = []
-        self.errors: List[str] = []
+        self.status_codes = {}
+        self.response_times = []
+        self.errors = []
         self.lock = asyncio.Lock()
     
     @property
-    def duration(self) -> float:
+    def duration(self):
         end = self.end_time or time.time()
         return end - self.start_time
     
     @property
-    def requests_per_second(self) -> float:
+    def requests_per_second(self):
         return self.total_requests / max(self.duration, 0.001)
     
     @property
-    def success_rate(self) -> float:
+    def success_rate(self):
         if self.total_requests == 0:
             return 0
         return (self.successful_requests / self.total_requests) * 100
     
     @property
-    def avg_response_time(self) -> float:
+    def avg_response_time(self):
         if not self.response_times:
             return 0
         return sum(self.response_times) / len(self.response_times)
     
-    async def record_request(self, success: bool, status_code: int, 
-                             response_time: float, error: Optional[str] = None):
+    async def record_request(self, success, status_code, response_time, error=None):
         async with self.lock:
             self.total_requests += 1
             if success:
@@ -123,55 +119,52 @@ class LoadTestMetrics:
                     self.errors.append(error[:200])
 
 class LoadTester:
-    def __init__(self, session: ClientSession):
+    def __init__(self, session):
         self.session = session
         self.metrics = LoadTestMetrics()
         self.is_running = False
         self.test_id = None
     
-    async def send_request(self, url: str, headers: Dict, test_type: str) -> Tuple[bool, int, float, str]:
+    async def send_request(self, url, headers, test_type):
         start_time = time.time()
         try:
-            if test_type == 'bad_request':
-                headers['Content-Type'] = 'application/json'
-                async with self.session.post(url, headers=headers, 
-                                           data='{invalid_json}') as response:
+            if test_type == "bad_request":
+                headers["Content-Type"] = "application/json"
+                async with self.session.post(url, headers=headers, data="{invalid_json}") as response:
                     await response.read()
                     response_time = time.time() - start_time
-                    return (True, response.status, response_time, '')
+                    return (True, response.status, response_time, "")
             
-            elif test_type == 'post_flood':
-                headers['Content-Type'] = 'application/x-www-form-urlencoded'
-                async with self.session.post(url, headers=headers, 
-                                           data='test=data&load=testing') as response:
+            elif test_type == "post_flood":
+                headers["Content-Type"] = "application/x-www-form-urlencoded"
+                async with self.session.post(url, headers=headers, data="test=data&load=testing") as response:
                     await response.read()
                     response_time = time.time() - start_time
-                    return (True, response.status, response_time, '')
+                    return (True, response.status, response_time, "")
             
             else:
                 async with self.session.get(url, headers=headers, ssl=False) as response:
                     await response.read()
                     response_time = time.time() - start_time
-                    return (True, response.status, response_time, '')
+                    return (True, response.status, response_time, "")
         
         except asyncio.TimeoutError:
-            return (False, 0, time.time() - start_time, 'Timeout')
+            return (False, 0, time.time() - start_time, "Timeout")
         except ClientError as e:
-            return (False, 0, time.time() - start_time, f'Client error: {str(e)}')
+            return (False, 0, time.time() - start_time, f"Client error: {str(e)}")
         except Exception as e:
-            return (False, 0, time.time() - start_time, f'Error: {str(e)}')
+            return (False, 0, time.time() - start_time, f"Error: {str(e)}")
     
-    async def worker(self, url: str, delay: float, test_type: str, 
-                     semaphore: asyncio.Semaphore):
+    async def worker(self, url, delay, test_type, semaphore):
         while self.is_running:
             async with semaphore:
                 if not self.is_running:
                     break
                 
                 headers = {
-                    'User-Agent': random.choice(USER_AGENTS),
-                    'Accept': '*/*',
-                    'Cache-Control': 'no-cache'
+                    "User-Agent": random.choice(USER_AGENTS),
+                    "Accept": "*/*",
+                    "Cache-Control": "no-cache"
                 }
                 
                 success, status_code, response_time, error = await self.send_request(
@@ -183,10 +176,9 @@ class LoadTester:
                 if delay > 0:
                     await asyncio.sleep(delay)
     
-    async def start_test(self, url: str, requests: int, threads: int, 
-                         delay: float, test_type: str) -> LoadTestMetrics:
+    async def start_test(self, url, requests, threads, delay, test_type):
         self.is_running = True
-        self.test_id = datetime.now().strftime('%Y%m%d_%H%M%S')
+        self.test_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.metrics = LoadTestMetrics()
         
         threads = min(threads, MAX_THREADS)
@@ -217,75 +209,63 @@ class LoadTester:
 # ==================== DISCORD BOT ====================
 
 class TestView(ui.View):
-    def __init__(self, tester: LoadTester):
+    def __init__(self, tester):
         super().__init__(timeout=None)
         self.tester = tester
     
-    @ui.button(label='🛑 Stop Test', style=discord.ButtonStyle.danger, custom_id='stop_test')
-    async def stop_test(self, interaction: discord.Interaction, button: ui.Button):
+    @ui.button(label="Stop Test", style=discord.ButtonStyle.danger)
+    async def stop_test(self, interaction, button):
         if self.tester.is_running:
             self.tester.is_running = False
-            await interaction.response.send_message(
-                '🛑 Stopping test... Waiting for current requests.', 
-                ephemeral=True
-            )
+            await interaction.response.send_message("Stopping test...", ephemeral=True)
         else:
-            await interaction.response.send_message('❌ No test running.', ephemeral=True)
+            await interaction.response.send_message("No test running.", ephemeral=True)
 
 class LoadTestBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
-        super().__init__(command_prefix='!', intents=intents)
+        super().__init__(command_prefix="!", intents=intents)
         self.testing_in_progress = {}
     
     async def setup_hook(self):
         await self.tree.sync()
-        print(f'✅ Bot connected: {self.user}')
+        print(f"Bot connected: {self.user}")
     
-    async def update_metrics_embed(self, message: discord.Message, 
-                                   tester: LoadTester, url: str):
+    async def update_metrics_embed(self, message, tester, url):
         metrics = tester.metrics
         
         embed = Embed(
-            title='🚀 Load Test in Progress',
-            description= 'loading',
+            title="Load Test in Progress",
+            description=f"URL: {url}\\nTest ID: {tester.test_id}",
             color=discord.Color.yellow(),
             timestamp=datetime.now()
         )
         
         # Progress bar
         progress = min((metrics.total_requests / MAX_REQUESTS_PER_TEST) * 100, 100)
-        bar = '█' * int(progress // 5) + '░' * (20 - int(progress // 5))
+        bar = "█" * int(progress // 5) + "░" * (20 - int(progress // 5))
         
         embed.add_field(
-            name='📈 Progress',
-            value=f'`{bar}` {progress:.1f}%\n**Requests:** {metrics.total_requests:,}',
+            name="Progress",
+            value=f"Bar: {bar} {progress:.1f}%\\nRequests: {metrics.total_requests}",
             inline=False
         )
         
         embed.add_field(
-            name='⏱️ Performance',
-            value=f'**RPS:** {metrics.requests_per_second:.2f}\n'
-                  f'**Avg Response:** {metrics.avg_response_time*1000:.2f}ms\n'
-                  f'**Duration:** {metrics.duration:.1f}s',
+            name="Performance",
+            value=f"RPS: {metrics.requests_per_second:.2f}\\n"
+                  f"Avg Response: {metrics.avg_response_time*1000:.2f}ms\\n"
+                  f"Duration: {metrics.duration:.1f}s",
             inline=True
         )
         
         embed.add_field(
-            name='✅ Results',
-            value=f'**Success Rate:** {metrics.success_rate:.1f}%\n'
-                  f'**Successful:** {metrics.successful_requests:,}\n'
-                  f'**Failed:** {metrics.failed_requests:,}',
+            name="Results",
+            value=f"Success Rate: {metrics.success_rate:.1f}%\\n"
+                  f"Successful: {metrics.successful_requests}\\n"
+                  f"Failed: {metrics.failed_requests}",
             inline=True
         )
-        
-        if metrics.status_codes:
-            status_dist = '\\n'.join(
-                f'{code}: {count}' for code, count in sorted(
-                    metrics.status_codes.items(), key=lambda x: x[1], reverse=True
-                )[:5]
-            )
-            embed.add_field(name='📊 Status Codes', value=status_dist or 'None', inline=True)
         
         try:
             await message.edit(embed=embed, view=TestView(tester))
@@ -296,252 +276,134 @@ bot = LoadTestBot()
 
 # ==================== VERIFICATION HELPERS ====================
 
-def is_ip_address(target: str) -> bool:
+def is_ip_address(target):
     try:
         ipaddress.ip_address(target)
         return True
-    except ValueError:
+    except:
         return False
 
-def is_private_network(target: str) -> bool:
+def is_private_network(target):
     try:
         ip = ipaddress.ip_address(target)
         return ip.is_private or ip.is_loopback
-    except ValueError:
+    except:
         return False
 
-def needs_verification(url: str) -> bool:
+def needs_verification(url):
     if DEV_MODE:
         return False
     
-    parsed = urlparse(url if '://' in url else f'https://{url}')
+    parsed = urlparse(url if "://" in url else f"https://{url}")
     domain = parsed.netloc or parsed.path
+    domain = domain.split(":")[0]
     
-    # Remove port if present
-    domain = domain.split(':')[0]
-    
-    # IP addresses - allow private networks without verification
     if is_ip_address(domain):
         if is_private_network(domain):
             return False
         else:
-            return True  # Public IPs need verification
+            return True
     
-    # Localhost
-    if domain in ('localhost', '127.0.0.1'):
+    if domain in ("localhost", "127.0.0.1"):
         return False
     
-    # Check verified domains
     return domain not in VERIFIED_DOMAINS
 
 # ==================== COMMANDS ====================
 
-@bot.tree.command(name='verify', description='Verify domain ownership (not needed for localhost/IPs)')
-@app_commands.describe(domain='Domain or IP to verify')
-async def verify_domain(interaction: discord.Interaction, domain: str):
+@bot.tree.command(name="verify", description="Verify domain ownership")
+async def verify_domain(interaction, domain):
     await interaction.response.defer(ephemeral=True)
     
-    # Check if it's an IP
     if is_ip_address(domain):
         if is_private_network(domain):
-            await interaction.followup.send(
-                '✅ **Private IP detected** - No verification needed for localhost/private networks.', 
-                ephemeral=True
-            )
+            await interaction.followup.send("Private IP - no verification needed", ephemeral=True)
             return
         else:
-            await interaction.followup.send(
-                '⚠️ **Public IP detected** - Please use a domain name instead for tracking.', 
-                ephemeral=True
-            )
             VERIFIED_DOMAINS.add(domain)
+            await interaction.followup.send("Public IP added", ephemeral=True)
             return
     
-    # For domains, show verification challenge
-    parsed = urlparse(domain if '://' in domain else f'https://{domain}')
+    parsed = urlparse(domain if "://" in domain else f"https://{domain}")
     domain_name = parsed.netloc or parsed.path
     
-    challenge_token = f'loadtest-{random.randint(1000, 9999)}'
-    
     embed = Embed(
-        title='🔐 Domain Verification',
-        description=f'Verify **{domain_name}** by adding this TXT record:',
+        title="Domain Verification",
+        description=f"Verify {domain_name}",
         color=discord.Color.blue()
     )
     
-    embed.add_field(
-        name='DNS TXT Record',
-        value=f'```\\n@ IN TXT \"{challenge_token}\"\\n```',
-        inline=False
-    )
+    embed.add_field(name="Method", value="Add DNS TXT record or HTTP file", inline=False)
     
-    embed.add_field(
-        name='Alternative',
-        value=f'Or visit: http://{domain_name}/{challenge_token}.txt',
-        inline=False
-    )
+    verify_button = ui.Button(label="Verify", style=discord.ButtonStyle.success)
     
-    verify_button = ui.Button(label='✅ I\\'ve Added It', style=discord.ButtonStyle.success)
-    
-    async def verify_callback(verify_interaction: discord.Interaction):
-        await asyncio.sleep(2)
+    async def verify_callback(verify_interaction):
         VERIFIED_DOMAINS.add(domain_name)
-        await verify_interaction.response.send_message(
-            f'✅ **{domain_name}** verified successfully!', 
-            ephemeral=True
-        )
+        await verify_interaction.response.send_message(f"Verified {domain_name}", ephemeral=True)
     
     verify_button.callback = verify_callback
     view = ui.View().add_item(verify_button)
     
     await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
-@bot.tree.command(name='loadtest', description='Start controlled load test on YOUR infrastructure')
+@bot.tree.command(name="loadtest", description="Start load test")
 @app_commands.describe(
-    url='Target URL (localhost/IP/domain)',
-    requests='Number of requests (max 10,000)',
-    threads='Concurrent threads (max 50)',
-    delay='Delay between requests (min 0.01s)',
-    mode='Testing mode'
+    url="Target URL",
+    requests="Number of requests",
+    threads="Concurrent threads",
+    delay="Delay between requests",
+    mode="Testing mode"
 )
-@app_commands.choices(mode=[
-    app_commands.Choice(name='Standard Load (GET)', value='standard'),
-    app_commands.Choice(name='Stress Test (Fast GET)', value='stress'),
-    app_commands.Choice(name='POST Flood', value='post_flood'),
-    app_commands.Choice(name='Edge Case (Bad Data)', value='bad_request'),
-])
 async def loadtest(
-    interaction: discord.Interaction,
-    url: str,
-    requests: app_commands.Range[int, 1, MAX_REQUESTS_PER_TEST],
-    threads: app_commands.Range[int, 1, MAX_THREADS] = DEFAULT_THREADS,
-    delay: app_commands.Range[float, MIN_DELAY, 10.0] = 0.1,
-    mode: str = 'standard'
+    interaction,
+    url,
+    requests,
+    threads=DEFAULT_THREADS,
+    delay=0.1,
+    mode="standard"
 ):
-    
-    # Check if verification is needed
-    parsed = urlparse(url if '://' in url else f'https://{url}')
-    hostname = (parsed.netloc or parsed.path).split(':')[0]
+    hostname = urlparse(url if "://" in url else f"https://{url}").netloc or urlparse(url).path
+    hostname = hostname.split(":")[0]
     
     if needs_verification(url):
-        embed = Embed(
-            title='❌ Verification Required',
-            description=f'Domain **{hostname}** must be verified first.',
-            color=discord.Color.red()
-        )
-        
-        if is_ip_address(hostname) and not is_private_network(hostname):
-            embed.add_field(
-                name='🔧 For Public IPs',
-                value=f'Use /verify domain:{hostname} with a dummy token, or set DEV_MODE=true in .env',
-                inline=False
-            )
-        else:
-            embed.add_field(
-                name='🔧 How to Verify',
-                value=f'Run /verify domain:{hostname}',
-                inline=False
-            )
-        
-        # Add quick verify button for dev environments
-        quick_verify = ui.Button(label='Quick Verify (Dev)', style=discord.ButtonStyle.secondary)
-        
-        async def quick_verify_callback(verify_interaction: discord.Interaction):
-            if DEV_MODE or is_ip_address(hostname) or is_private_network(hostname):
-                VERIFIED_DOMAINS.add(hostname)
-                await verify_interaction.response.send_message(
-                    f'✅ **{hostname}** quick-verified!', 
-                    ephemeral=True
-                )
-            else:
-                await verify_interaction.response.send_message(
-                    '⚠️ Quick verify only works for IPs in dev mode.', 
-                    ephemeral=True
-                )
-        
-        quick_verify.callback = quick_verify_callback
-        view = ui.View().add_item(quick_verify)
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        embed = Embed(title="Verification Required", description=f"Verify {hostname} first", color=discord.Color.red())
+        await interaction.response.send_message(embed=embed, ephemeral=True)
         return
     
-    # Safety adjustments
     threads = min(threads, MAX_THREADS)
-    if mode == 'stress':
+    if mode == "stress":
         delay = MIN_DELAY
     
-    # Confirm test
-    embed = Embed(
-        title='🚀 Load Test Starting',
-        description=f'**URL:** {url}\\n**Mode:** {mode}\\n**Requests:** {requests:,}',
-        color=discord.Color.yellow()
-    )
-    
-    embed.add_field(name='Config', value=f'Threads: {threads}\\nDelay: {delay}s', inline=True)
-    
-    if DEV_MODE:
-        embed.add_field(
-            name='⚠️ DEV MODE ACTIVE',
-            value='Verification disabled. Only test YOUR infrastructure!',
-            inline=False
-        )
-    
+    embed = Embed(title="Load Test Starting", description=f"URL: {url}", color=discord.Color.yellow())
     await interaction.response.send_message(embed=embed, ephemeral=False)
     
-    # Run test
     timeout = ClientTimeout(total=30)
     async with ClientSession(timeout=timeout) as session:
         tester = LoadTester(session)
         
-        # Initial status message
         status_msg = await interaction.channel.send(
-            embed=Embed(title='🔄 Initializing...', description='Setting up test...', 
-                       color=discord.Color.blue()),
+            embed=Embed(title="Initializing...", color=discord.Color.blue()),
             view=TestView(tester)
         )
         
         bot.testing_in_progress[interaction.channel_id] = {
-            'tester': tester,
-            'message_id': status_msg.id,
-            'url': url
+            "tester": tester,
+            "message_id": status_msg.id,
+            "url": url
         }
         
         async def run_test():
             try:
                 metrics = await tester.start_test(url, requests, threads, delay, mode)
                 
-                # Final results
-                final_embed = Embed(
-                    title='✅ Test Completed',
-                    description=f'Test ID: {tester.test_id}',
-                    color=discord.Color.green() if metrics.success_rate > 90 else discord.Color.orange(),
-                    timestamp=datetime.now()
-                )
-                
-                final_embed.add_field(
-                    name='📊 Summary',
-                    value=f'Total: {metrics.total_requests:,}\\n'
-                          f'Success: {metrics.successful_requests:,} ({metrics.success_rate:.1f}%)\\n'
-                          f'Failed: {metrics.failed_requests:,}',
-                    inline=True
-                )
-                
-                final_embed.add_field(
-                    name='⚡ Performance',
-                    value=f'Duration: {metrics.duration:.2f}s\\n'
-                          f'RPS: {metrics.requests_per_second:.2f}\\n'
-                          f'Avg Response: {metrics.avg_response_time*1000:.2f}ms',
-                    inline=True
-                )
+                final_embed = Embed(title="Test Completed", color=discord.Color.green())
+                final_embed.add_field(name="Total", value=metrics.total_requests)
+                final_embed.add_field(name="Success Rate", value=f"{metrics.success_rate:.1f}%")
                 
                 await status_msg.edit(embed=final_embed, view=None)
                 
             except Exception as e:
-                error_embed = Embed(
-                    title='❌ Test Failed',
-                    description=f'Error: {str(e)[:200]}',
-                    color=discord.Color.red()
-                )
+                error_embed = Embed(title="Test Failed", description=str(e)[:200], color=discord.Color.red())
                 await status_msg.edit(embed=error_embed, view=None)
             
             finally:
@@ -549,50 +411,24 @@ async def loadtest(
         
         asyncio.create_task(run_test())
 
-@bot.tree.command(name='status', description='Check bot configuration')
-async def status(interaction: discord.Interaction):
-    embed = Embed(title='🛡️ Bot Status', color=discord.Color.blue())
-    
-    embed.add_field(
-        name='Safety Limits',
-        value=f'Max Requests: {MAX_REQUESTS_PER_TEST:,}\\n'
-              f'Max RPS: {MAX_REQUESTS_PER_SECOND}\\n'
-              f'Max Threads: {MAX_THREADS}\\n'
-              f'Min Delay: {MIN_DELAY}s',
-        inline=True
-    )
-    
-    embed.add_field(
-        name='Current Status',
-        value=f'Active Tests: {len(bot.testing_in_progress)}\\n'
-              f'Dev Mode: {\\'ON\\' if DEV_MODE else \\'OFF\\'}\\n'
-              f'Verified: {len(VERIFIED_DOMAINS)} domains',
-        inline=True
-    )
-    
+@bot.tree.command(name="status", description="Check bot status")
+async def status(interaction):
+    embed = Embed(title="Bot Status", color=discord.Color.blue())
+    embed.add_field(name="Active Tests", value=len(bot.testing_in_progress))
+    embed.add_field(name="Dev Mode", value="ON" if DEV_MODE else "OFF")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # ==================== RUN BOT ====================
 
-if __name__ == '__main__':
-    print('='*50)
-    print('🚀 Discord Load Testing Bot')
-    print('='*50)
-    print(f'Dev Mode: {\\'ON\\' if DEV_MODE else \\'OFF\\'}')
-    print(f'Max RPS: {MAX_REQUESTS_PER_SECOND}')
-    print(f'Max Requests: {MAX_REQUESTS_PER_TEST:,}')
-    print('='*50)
-    
+if __name__ == "__main__":
+    print("Starting bot...")
     bot.run(BOT_TOKEN)
-"""
+'''
 
 # --- 4. STARTUP ENGINE ---
 def run_bot():
-    # Setup new loop for this specific background thread
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
-    # Passing 'globals()' ensures functions can see each other
     exec(RAW_CODE, globals())
 
 if FIRST_RUN:
@@ -602,6 +438,5 @@ if FIRST_RUN:
 else:
     st.info("ℹ️ Bot is already running in the background.")
 
-# Show a small clock so the user knows the page is "alive"
 st.divider()
 st.caption(f"Last page refresh: {time.strftime('%H:%M:%S')}")
