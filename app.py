@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from urllib.parse import urlparse
 import ipaddress
-
+from aio import start_webserver
 import discord
 from discord import app_commands, ui, Embed, File, Interaction
 from discord.ext import commands
@@ -406,5 +406,6 @@ async def status(interaction: Interaction):
 
 if __name__ == "__main__":
     print("Starting bot...")
+    asyncio.get_event_loop().create_task(start_webserver())
     bot.run(BOT_TOKEN)
 
