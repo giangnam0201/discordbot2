@@ -8,8 +8,8 @@ import json
 from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 from urllib.parse import urlparse
-import ipaddress
-from aio import start_webserver
+from aio import keep_alive
+
 import discord
 from discord import app_commands, ui, Embed, File, Interaction
 from discord.ext import commands
@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 # ==================== CONFIGURATION ====================
 
 load_dotenv()
+keep_alive()
 
 # SAFETY LIMITS
 MAX_REQUESTS_PER_TEST = 10000
@@ -406,6 +407,5 @@ async def status(interaction: Interaction):
 
 if __name__ == "__main__":
     print("Starting bot...")
-    asyncio.get_event_loop().create_task(start_webserver())
     bot.run(BOT_TOKEN)
 
