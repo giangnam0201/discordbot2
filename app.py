@@ -1,29 +1,4 @@
-import streamlit as st
-import threading
-import os
-import asyncio
-import sys
-import time
 
-# --- 1. THE "ULTIMATE" GLOBAL LOCK ---
-if "bot_lock" not in sys.modules:
-    sys.modules["bot_lock"] = True
-    FIRST_RUN = True
-else:
-    FIRST_RUN = False
-
-# --- 2. STREAMLIT UI ---
-st.set_page_config(page_title="Bot Server", page_icon="🚀")
-st.title("Service Status: Online ✅")
-st.write("The bot is running in the background.")
-
-# Injects Streamlit Secrets into environment
-for key, value in st.secrets.items():
-    os.environ[key] = str(value)
-
-# --- 3. YOUR CODE ---
-# Use triple single quotes - ALL parameters must have type annotations for discord.py
-RAW_CODE = '''
 # Discord Load Testing Bot - FIXED FOR STREAMLIT & DISCORD.PY
 import os
 import asyncio
@@ -432,20 +407,4 @@ async def status(interaction: Interaction):
 if __name__ == "__main__":
     print("Starting bot...")
     bot.run(BOT_TOKEN)
-'''
 
-# --- 4. STARTUP ENGINE ---
-def run_bot():
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    exec(RAW_CODE, globals())
-
-if FIRST_RUN:
-    thread = threading.Thread(target=run_bot, daemon=True)
-    thread.start()
-    st.success("🚀 Bot launched for the first time!")
-else:
-    st.info("ℹ️ Bot is already running in the background.")
-
-st.divider()
-st.caption(f"Last page refresh: {time.strftime('%H:%M:%S')}")
